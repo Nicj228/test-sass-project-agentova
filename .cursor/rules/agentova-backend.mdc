@@ -1,0 +1,522 @@
+---
+description: Toutes les règles backend Firebase/PostgreSQL du projet
+globs: ["server/**/*.ts"]
+alwaysApply: true
+---
+
+# 🔥 RÈGLES BACKEND COMPLÈTES
+
+## 🏗️ ARCHITECTURE BACKEND OBLIGATOIRE
+- **Firebase Functions** : Validation cascade (auth → params → workspace → métier) + `onCall` configuration
+- **Repositories** : Pattern singleton + Pool PostgreSQL + Isolation workspace + Construction lazy
+- **Réponses** : `createResponseWithTokens()` obligatoire + Gestion erreurs + Logger
+
+## 🔐 SÉCURITÉ NON-NÉGOCIABLE BACKEND
+- ✅ **validateAuth(request.auth)** côté serveur TOUJOURS en premier
+- ✅ **verifyWorkspaceToken()** avec rôles appropriés
+- ✅ **WORKSPACE_ROLES.ADMIN/EDITOR** selon contexte
+- ✅ **Secrets Firebase** pour toutes les clés sensibles
+- ❌ **JAMAIS** de données sensibles côté client
+- ❌ **JAMAIS** de clés hardcodées
+- ❌ **JAMAIS** d'accès direct BDD sans validation workspace
+
+## 🔐 SÉCURITÉ FONCTIONS onRequest OBLIGATOIRE
+- ✅ **Usage INTERNE** : `serverToken` validation obligatoire (Cloud Tasks, cron jobs)
+- ✅ **Usage EXTERNE** : `workspaceToken` + `validateIdToken` obligatoire (API publiques)
+- ❌ **JAMAIS** de fonction `onRequest` sans aucune sécurité (sauf webhooks tiers explicites)
+- ✅ **Pattern interne** : `const providedToken = request.headers['x-server-token']; if (!providedToken || providedToken !== serverToken.value())`
+- ✅ **Pattern externe** : `const idToken = req.headers.authorization?.split('Bearer ')[1]; const workspaceToken = req.headers['x-workspace-token'];`
+
+## 🚫 ANTI-PATTERNS BACKEND INTERDITS
+- ❌ **Functions Firebase sans validateAuth**
+- ❌ **Accès BDD sans isolation workspace**
+- ❌ **Réponses non standardisées** (sans createResponseWithTokens)
+- ❌ **Erreurs non loggées**
+- ❌ **Secrets non configurés**
+- ❌ **Repositories non-singleton**
+- ❌ **Fonctions onRequest sans sécurité** (ni serverToken ni workspaceToken)
+- ❌ **Usage incorrect des tokens** (serverToken pour externe, workspaceToken pour interne)
+
+## ✅ FIREBASE FUNCTION PATTERN OBLIGATOIRE
+
+### ✅ Pattern onCall (standard)
+```typescript
+export const functionName = onCall({
+  // ✅ Configuration complète
+  secrets: [databaseUrlProd, jwtWorkspaceSecret],
+  memory: '512MiB',
+  timeoutSeconds: 60
+}, async (request) => {
+  try {
+    // ✅ 1. Validation auth OBLIGATOIRE
+    const authResponse = validateAuth(request.auth);
+    if (!isSuccess(authResponse)) return authResponse;
+    const uid = authResponse.user;
+
+    // ✅ 2. Extraction et validation params
+    const { workspaceToken, param1, param2 } = request.data;
+    const validationResponse = validateRequiredFields(request.data, [
+      'workspaceToken', 'param1'
+    ]);
+    if (!isSuccess(validationResponse)) return validationResponse;
+
+    // ✅ 3. Validation workspace + rôles
+    const tokenValidation = await verifyWorkspaceToken(
+      workspaceToken, 
+      uid, 
+      WORKSPACE_ROLES.EDITOR
+    );
+    const validationResult = isValidWorkspaceToken(tokenValidation);
+    if (!isSuccess(validationResult)) return validationResult;
+    const { workspace_id, workspace_tokens } = validationResult;
+    const response = createResponseWithTokens(workspace_tokens);
+
+    // ✅ 4. Validation métier spécifique (si nécessaire)
+    if (param1.length > 100) {
+      return response.error(ERRORS.INVALID_INPUT);
+    }
+
+    // ✅ 5. Logique métier via repository
+    const result = await getRepository().action(workspace_id, param1, param2);
+
+    // ✅ 6. Logging succès
+    logger.info(`Action réussie pour workspace ${workspace_id} par ${uid}`);
+
+    // ✅ 7. Réponse standardisée
+    return response.success({ result });
+    
+  } catch (error) {
+    logger.error(`Erreur dans ${functionName.name}:`, error);
+    return handleError(error);
+  }
+});
+```
+
+### ✅ Pattern onRequest INTERNE (Cloud Tasks, cron jobs)
+```typescript
+export const internalFunction = onRequest({
+  secrets: [serverToken, databaseUrlProd],
+  memory: '512MiB',
+  timeoutSeconds: 120
+}, async (request, response) => {
+  try {
+    // ✅ 1. Vérifier méthode HTTP
+    if (request.method !== 'POST') {
+      response.status(405).send('Method Not Allowed');
+      return;
+    }
+
+    // ✅ 2. VALIDATION SERVERTOKEN OBLIGATOIRE
+    const providedToken = request.headers['x-server-token'];
+    if (!providedToken || providedToken !== serverToken.value()) {
+      logger.error('❌ Token serveur invalide');
+      response.status(401).json({ success: false, error: 'Non autorisé' });
+      return;
+    }
+
+    // ✅ 3. Validation params
+    const { workspace_id, param1 } = request.body;
+    if (!workspace_id || !param1) {
+      response.status(400).send('Bad Request - Paramètres manquants');
+      return;
+    }
+
+    // ✅ 4. Logique métier
+    const result = await getRepository().action(workspace_id, param1);
+
+    // ✅ 5. Réponse
+    response.status(200).send('OK');
+  } catch (error) {
+    logger.error('Erreur fonction interne:', error);
+    response.status(200).send('OK'); // 200 pour éviter retries Cloud Tasks
+  }
+});
+```
+
+### ✅ Pattern onRequest EXTERNE (API publiques)
+```typescript
+export const externalFunction = onRequest({
+  secrets: [jwtWorkspaceSecret, databaseUrlProd],
+  cors: true,
+  memory: '512MiB'
+}, async (req: Request, res: Response) => {
+  try {
+    // ✅ 1. CORS Options
+    if (req.method === 'OPTIONS') {
+      res.status(200).end();
+      return;
+    }
+
+    // ✅ 2. VALIDATION TOKENS OBLIGATOIRE
+    const idToken = req.headers.authorization?.split('Bearer ')[1];
+    const workspaceToken = req.headers['x-workspace-token'];
+
+    if (!idToken) {
+      res.status(401).json(ERRORS.TOKEN_NOT_FOUND);
+      return;
+    }
+    if (!workspaceToken) {
+      res.status(401).json(WORKSPACE_TOKEN_STATE[WorkspaceTokenState.WORKSPACE_TOKEN_NULL]);
+      return;
+    }
+
+    // ✅ 3. Validation Firebase token
+    const tokenValidation = await validateIdToken(idToken);
+    if (!isSuccess(tokenValidation)) {
+      res.status(401).json(tokenValidation.error);
+      return;
+    }
+    const uid = tokenValidation.user;
+
+    // ✅ 4. Validation workspace token
+    const tokenWorkspaceValidation = await verifyWorkspaceToken(
+      workspaceToken as string, 
+      uid, 
+      WORKSPACE_ROLES.EDITOR
+    );
+    const validationResult = isValidWorkspaceToken(tokenWorkspaceValidation);
+    if (!isSuccess(validationResult)) {
+      res.status(401).json(validationResult.error);
+      return;
+    }
+    const { workspace_id } = validationResult;
+
+    // ✅ 5. Logique métier
+    const result = await getRepository().action(workspace_id, req.body);
+
+    // ✅ 6. Réponse
+    res.status(200).json({ success: true, data: result });
+  } catch (error) {
+    logger.error('Erreur fonction externe:', error);
+    res.status(500).json({ success: false, error: 'Erreur serveur' });
+  }
+});
+```
+
+## ✅ REPOSITORY PATTERN OBLIGATOIRE
+```typescript
+export class DomainRepository {
+  private pool: Pool;
+
+  constructor() {
+    this.pool = getPool(); // ✅ Pool PostgreSQL
+  }
+
+  // ✅ Méthodes avec isolation workspace
+  async getByWorkspace(workspaceId: string): Promise<DomainType[]> {
+    const result = await this.pool.query<DomainType>(
+      'SELECT * FROM table_name WHERE workspace_id = $1',
+      [workspaceId] // ✅ Paramètres préparés
+    );
+    return result.rows;
+  }
+
+  // ✅ TOUJOURS récupérer avec workspace pour sécurité
+  async getById(id: string, workspaceId: string): Promise<DomainType | null> {
+    const result = await this.pool.query<DomainType>(
+      'SELECT * FROM table WHERE id = $1 AND workspace_id = $2',
+      [id, workspaceId]
+    );
+    return result.rows[0] || null;
+  }
+
+  async create(workspaceId: string, data: CreateType): Promise<DomainType> {
+    const result = await this.pool.query<DomainType>(
+      `INSERT INTO table_name (workspace_id, field1, field2)
+       VALUES ($1, $2, $3)
+       RETURNING *`,
+      [workspaceId, data.field1, data.field2]
+    );
+    return result.rows[0];
+  }
+}
+
+// ✅ Singleton avec lazy initialization
+let domainRepo: DomainRepository | undefined;
+
+export function getDomainRepository(): DomainRepository {
+  if (!domainRepo) {
+    domainRepo = new DomainRepository();
+  }
+  return domainRepo;
+}
+```
+
+## 🔐 VALIDATION DONNÉES BACKEND
+- ✅ **validateRequiredFields()** avant traitement
+- ✅ **Sanitisation** de tous les inputs utilisateur
+- ✅ **Validation types** (hex colors, file types, etc.)
+- ✅ **Paramètres préparés** pour SQL
+- ❌ **JAMAIS** de concaténation SQL directe
+
+## 📝 VALIDATION BACKEND PATTERN
+```typescript
+// ❌ INTERDIT - validateRequiredFields au mauvais endroit
+const validationResponse = validateRequiredFields(request.data, ['workspaceToken']);
+
+// ✅ OBLIGATOIRE - Créer fichier validation + process avant envoi
+// Dans un fichier séparé de validation métier
+export function validateCampaignData(data: CampaignInput): ValidationResult {
+  // Validation spécifique métier
+}
+```
+
+## 🔧 ENVIRONMENT CONFIGURATION
+```typescript
+// ✅ Distinction dev/prod obligatoire
+const config = process.env.NODE_ENV === 'development' 
+  ? DEV_CONFIG : PROD_CONFIG;
+
+// ✅ Émulateurs Firebase en dev
+setGlobalOptions({
+  region: process.env.NODE_ENV === 'development' 
+    ? 'us-central1' : 'europe-west1'
+});
+```
+
+## 🔑 SECRETS MANAGEMENT
+```typescript
+// ✅ Pattern secrets Firebase
+export const mySecret = defineSecret('MY_SECRET_NAME');
+
+// ✅ Usage dans functions
+export const myFunction = onCall({
+  secrets: [mySecret]
+}, async (request) => {
+  const value = mySecret.value();
+});
+```
+
+## 📊 LOGGING RULES
+```typescript
+// ✅ Logging structuré
+logger.info('Action réussie', { 
+  workspace_id, 
+  user_id, 
+  action: 'create_document' 
+});
+
+// ✅ Erreurs détaillées
+logger.error('Erreur validation', { 
+  error: error.message,
+  stack: error.stack,
+  context: { workspace_id, params }
+});
+```
+
+## 🔧 ERROR HANDLING BACKEND
+```typescript
+// ✅ Pattern standard
+try {
+  // logique
+} catch (error) {
+  logger.error(`Erreur dans ${functionName}:`, error);
+  return handleError(error);
+}
+```
+
+## 🔧 GESTIONNAIRE D'ERREURS CENTRALISÉ
+```typescript
+// ✅ Import obligatoire pour extraction d'erreurs
+import { extractErrorMessage, extractErrorMessageFromException, extractErrorMessageFromResponse } from '../utils/errorManager.js';
+
+// ✅ Extraction depuis objet JSON (responseData)
+const userMessage = extractErrorMessage(responseData) || 'Message fallback';
+
+// ✅ Extraction depuis Error JavaScript
+const userMessage = extractErrorMessageFromException(error);
+
+// ✅ Extraction depuis Response HTTP
+const userMessage = await extractErrorMessageFromResponse(response);
+
+// ✅ Gère automatiquement tous les formats providers :
+// - error_user_msg (Facebook/Instagram/Meta standard)
+// - error_data.details (WhatsApp spécifique)
+// - error.message (API générale)
+// - message (direct)
+```
+
+## 📊 PERFORMANCE BACKEND
+- ✅ **Pool connections** PostgreSQL
+- ✅ **Lazy initialization** repositories
+- ✅ **Paramètres préparés** SQL
+- ✅ **Pagination** pour listes importantes
+
+## 🧪 TESTING BACKEND
+```typescript
+// ✅ Tests fonctions Firebase
+const mockRequest = {
+  auth: { uid: 'test-user' },
+  data: { workspaceToken: 'valid-token' }
+};
+
+// ✅ Mocks repository
+jest.mock('../../db/repositories');
+```
+
+## 🗄️ PATTERNS REPOSITORIES DÉTECTÉS
+
+### ✅ Index de repositories centralisé
+```typescript
+// ✅ Pattern obligatoire dans server/db/repositories/index.ts
+let domainRepo: DomainRepository | undefined;
+
+export function getDomainRepository(): DomainRepository {
+  if (!domainRepo) {
+    domainRepo = new DomainRepository();
+  }
+  return domainRepo;
+}
+```
+
+### ✅ Isolation workspace systématique
+```typescript
+// ✅ Pattern détecté : TOUJOURS workspace en premier param
+async getItemsByWorkspace(
+  workspaceId: string,
+  params: { cursor?: Cursor; limit?: number; agentId?: string }
+): Promise<Response> {
+  // Requête avec workspace_id = $1
+}
+```
+
+## 🔥 PATTERNS FIREBASE FUNCTIONS DÉTECTÉS
+
+### ✅ Protection dev/prod
+```typescript
+// ✅ Pattern détecté dans devService.ts
+if (process.env.NODE_ENV !== 'development') {
+  throw new Error('❌ ERREUR CRITIQUE : devService.ts ne doit jamais être déployé en production !');
+}
+```
+
+### ✅ Configuration Firebase complète
+```typescript
+// ✅ Pattern détecté dans temporaryFileService.ts
+export const serviceName = onCall({
+  secrets: [requiredSecret, anotherSecret],
+  memory: '512MiB',
+  timeoutSeconds: 60
+}, async (request) => {
+  // Implementation avec validation cascade
+});
+```
+
+### ✅ Validation cascade standardisée
+```typescript
+// ✅ Pattern détecté : ordre obligatoire
+try {
+  // 1️⃣ Validation auth OBLIGATOIRE
+  const authResponse = validateAuth(request.auth);
+  if (!isSuccess(authResponse)) return authResponse;
+
+  // 2️⃣ Validation params requis
+  const validationResponse = validateRequiredFields(request.data, ['field1']);
+  if (!isSuccess(validationResponse)) return validationResponse;
+
+  // 3️⃣ Validation workspace (si nécessaire)
+  const tokenValidation = await verifyWorkspaceToken(token, uid, role);
+  // ...
+
+  // 4️⃣ Validation métier spécifique
+  // 5️⃣ Logique métier
+  // 6️⃣ Logging succès
+  // 7️⃣ Réponse standardisée
+} catch (error) {
+  logger.error('Erreur dans serviceName:', error);
+  return handleError(error);
+}
+```
+
+## 🔧 PATTERNS VALIDATION DÉTECTÉS
+
+### ✅ Validation couleurs hex
+```typescript
+// ✅ Pattern détecté dans validation.ts
+export function validateOptionalHexColor(color?: string | null): boolean {
+  if (!color) return true;
+  return /^#[0-9A-Fa-f]{6}$/.test(color);
+}
+```
+
+### ✅ Validation contraintes métier
+```typescript
+// ✅ Pattern détecté : validation spécifique par type
+export function validateDocumentConstraints(data: {
+  type: DocumentType;
+  name?: string | null;
+  description?: string | null;
+  url?: string | null;
+  corpus_document_id?: string | null;
+}): boolean {
+  switch (type) {
+    case DocumentType.INFO:
+      return name !== null && description !== null && 
+             url === null && corpus_document_id === null;
+    // Autres cas...
+  }
+}
+```
+
+### ✅ Gestion dev/prod dans validation
+```typescript
+// ✅ Pattern détecté dans validateIdToken
+if (process.env.NODE_ENV === 'development') {
+  // Mode développement : décoder sans vérifier
+  try {
+    const decoded: any = jwt.decode(idToken, { complete: false });
+    // ...
+  } catch (error) {
+    return { success: true, user: 'dev-user' }; // Fallback dev
+  }
+}
+// Production : vérification stricte
+```
+
+## ⚠️ Firebase Functions protection
+- ✅ **NODE_ENV checks** : Obligatoire pour fonctions dev-only
+- ✅ **Environment-specific secrets** : Différents secrets dev/prod
+
+### ⚠️ Validation cascade order
+- ✅ **7-step pattern** : Auth → Params → Workspace → Métier → Logic → Log → Response
+- ✅ **Error numbering** : Commentaires 1️⃣2️⃣3️⃣ pour clarté
+
+### ⚠️ Dev/Prod handling
+- ✅ **Emulator configuration** : us-central1 dev, europe-west1 prod
+- ✅ **Token validation** : Strict en prod, permissif en dev avec fallbacks
+
+## 🔧 TYPES ET VARIABLES RULES CRITIQUES
+
+### ✅ TYPES OBLIGATOIRES
+- ✅ **Types spécifiques** : TOUJOURS utiliser les types définis (`CustomAgentNotificationConfig` au lieu de `Record<string, any>`)
+- ✅ **Types shared/types.ts** : TOUS les types partagés DOIVENT être dans `shared/types.ts`
+- ✅ **Import correct** : `import { Type1, Type2 } from '../../../shared/types'`
+- ❌ **JAMAIS any** : Utiliser `unknown` si type inconnu
+
+### ❌ VARIABLES NON UTILISÉES INTERDITES
+```typescript
+// ❌ INTERDIT - Variable non utilisée
+const unusedVariable = someValue; // Variable jamais utilisée dans le code
+
+// ❌ INTERDIT - Import non utilisé  
+import { UnusedType } from './types'; // Import jamais utilisé
+
+// ✅ CORRECT - Toutes variables utilisées
+const usedVariable = someValue;
+console.log(usedVariable); // Variable utilisée
+```
+
+### ✅ REPOSITORY TYPES PATTERN OBLIGATOIRE
+```typescript
+// ❌ AVANT - Types génériques
+async create(
+  workspaceId: string,
+  config: Record<string, any>  // ❌ Type générique
+): Promise<Entity>
+
+// ✅ APRÈS - Types spécifiques
+async create(
+  workspaceId: string,
+  config: CustomAgentNotificationConfig  // ✅ Type spécifique
+): Promise<CustomAgentNotification>
+```

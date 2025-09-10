@@ -1,0 +1,51 @@
+---
+description: Guide d'utilisation du système de règles du projet
+globs: ["**/*"]
+alwaysApply: false
+---
+
+# 📋 SYSTÈME DE RÈGLES CONDENSÉ
+
+## 🎯 Comment utiliser ce système
+
+### ✅ **3 Fichiers de règles** (alwaysApply: true)
+Cursor applique automatiquement ces règles lors de la génération de code :
+- `agentova-frontend.mdc` - TOUTES les règles frontend React/Next.js + Services spéciaux (sessionService IA, authenticationService)
+- `agentova-backend.mdc` - TOUTES les règles backend Firebase/PostgreSQL + Patterns repositories détectés
+- `agentova-global.mdc` - TOUTES les règles globales (types, workspace, métier) + Patterns services détectés
+
+### 🔍 **Auto-vérification IA**
+Pour vérifier vos modifications, tapez simplement :
+```
+@ai-verify
+```
+
+L'IA va automatiquement :
+1. Lire toutes les règles `.mdc`
+2. Lire `.cursor/verification-checklist.md`
+3. Analyser vos modifications
+4. Générer un rapport détaillé
+5. Proposer des corrections
+
+### 📁 **Structure condensée**
+```
+.cursor/
+├── rules/
+│   ├── agentova-frontend.mdc     # Frontend + Services spéciaux (sessionService IA, authenticationService, patterns détectés)
+│   ├── agentova-backend.mdc      # Backend + Repositories + Firebase Functions + Patterns validation détectés
+│   ├── agentova-global.mdc       # Global + Types + Enums + Métier + Patterns services + Performance
+│   └── README.mdc                # Ce guide
+└── verification-checklist.md     # Instructions IA
+```
+
+### 🚀 **Le système garantit**
+- ✅ **Zero défaut** architectural
+- ✅ **Sécurité** workspace-centric
+- ✅ **Performance** optimisée
+- ✅ **Conventions** respectées
+- ✅ **Types** dans shared/types.ts
+- ✅ **Enums** au lieu de string unions
+- ✅ **Services locaux** utilisés correctement
+- ✅ **Patterns spécifiques** au projet respectés
+- ✅ **SessionService IA** avec FastAPI direct
+- ✅ **AuthenticationService** avec firewall et tokens

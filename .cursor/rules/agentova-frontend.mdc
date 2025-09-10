@@ -1,0 +1,786 @@
+---
+description: Toutes les règles frontend React/Next.js du projet
+globs: ["client/**/*.ts", "client/**/*.tsx"]
+alwaysApply: true
+---
+
+# ⚛️ RÈGLES FRONTEND COMPLÈTES
+
+## 🏗️ ARCHITECTURE FRONTEND OBLIGATOIRE
+- **Services** : Classes avec méthodes statiques UNIQUEMENT + `workspaceId` premier paramètre + `callSecuredFunction`
+- **Hooks** : `useWorkspaceContext()` + React Query + Return organisé + `useCallback` stabilisé
+- **Components** : Props typées + Interface explicite + `useCallback` handlers + Effects isolés
+- **Contexts** : État minimal + Providers + `useCallback` pour setters + `useMemo` pour valeurs
+
+## 🚫 ANTI-PATTERNS FRONTEND INTERDITS
+- ❌ **Appels API directs** dans composants (utiliser services)
+- ❌ **État dans classes de service** (statiques uniquement)
+- ❌ **Méthodes d'instance** dans services
+- ❌ **Components sans props typées**
+- ❌ **Effects avec multiples responsabilités**
+- ❌ **Handlers sans useCallback**
+- ❌ **Context values sans useMemo**
+- ❌ **Query keys hardcodées** (utiliser queryKeys.*)
+- ❌ **Variables non utilisées** (imports/variables inutiles)
+- ❌ **Types any** (utiliser types spécifiques)
+
+## ✅ SERVICE FRONTEND PATTERN OBLIGATOIRE
+```typescript
+export class DomainService {
+  // ✅ Méthodes statiques uniquement
+  static async methodName(
+    workspaceId: string, // ✅ Premier paramètre TOUJOURS
+    params: TypedParams   // ✅ Types explicites
+  ): Promise<ReturnType> {
+    try {
+      return await callSecuredFunction<ReturnType>(
+        'functionName',
+        workspaceId,
+        params
+      );
+    } catch (error) {
+      throw error; // ✅ Rethrow pour gestion niveau hook
+    }
+  }
+}
+```
+
+## ✅ HOOK FRONTEND PATTERN OBLIGATOIRE
+```typescript
+export function useDomain() {
+  // ✅ Context workspace obligatoire
+  const { currentWorkspaceId } = useWorkspaceContext();
+  const queryClient = useQueryClient();
+
+  // ✅ React Query avec clés standardisées
+  const query = useQuery({
+    queryKey: queryKeys.domain(currentWorkspaceId),
+    queryFn: () => DomainService.get(currentWorkspaceId),
+    staleTime: 0,
+    refetchOnMount: true,
+    placeholderData: (previousData) => previousData
+  });
+
+  // ✅ Mutations avec gestion cache
+  const mutation = useMutation({
+    mutationFn: (data: InputType) => 
+      DomainService.update(currentWorkspaceId, data),
+    onSuccess: (updatedData) => {
+      queryClient.setQueryData(
+        queryKeys.domain(currentWorkspaceId),
+        updatedData
+      );
+    }
+  });
+
+  // ✅ Fonctions utilitaires avec useCallback
+  const refresh = useCallback(async () => {
+    await queryClient.invalidateQueries({
+      queryKey: queryKeys.domain(currentWorkspaceId)
+    });
+  }, [currentWorkspaceId, queryClient]);
+
+  // ✅ Return organisé par catégorie
+  return {
+    // Data
+    data: query.data,
+    // Loading states
+    isLoading: query.isLoading,
+    isRefetching: query.isRefetching,
+    isError: query.isError,
+    // Actions
+    update: mutation.mutate,
+    isUpdating: mutation.isPending,
+    // Utils
+    refresh
+  };
+}
+```
+
+
+
+## ✅ CONTEXT FRONTEND PATTERN OBLIGATOIRE
+```typescript
+interface ContextType {
+  // ✅ Types explicites
+  value: string;
+  setValue: (value: string) => void;
+  isLoading: boolean;
+}
+
+const Context = createContext<ContextType | undefined>(undefined);
+
+export function ContextProvider({ children }: { children: ReactNode }) {
+  const [value, setValue] = useState<string>('');
+  const [isLoading, setIsLoading] = useState(false);
+
+  // ✅ Handlers stabilisés avec useCallback
+  const stableSetValue = useCallback((newValue: string) => {
+    setValue(newValue);
+  }, []);
+
+  // ✅ Valeur stabilisée avec useMemo
+  const contextValue = useMemo(() => ({
+    value,
+    setValue: stableSetValue,
+    isLoading
+  }), [value, stableSetValue, isLoading]);
+
+  return (
+    <Context.Provider value={contextValue}>
+      {children}
+    </Context.Provider>
+  );
+}
+
+export function useContext() {
+  const context = useContext(Context);
+  if (!context) {
+    throw new Error('useContext must be used within ContextProvider');
+  }
+  return context;
+}
+```
+
+## 🎯 REACT QUERY RULES COMPLÈTES
+```typescript
+// ✅ Configuration centralisée
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 0,                    // Toujours refetch
+      refetchOnMount: true,           // Refetch au montage
+      placeholderData: (prev) => prev // Garde données pendant refetch
+    }
+  }
+});
+
+// ✅ Query Keys hiérarchiques
+export const queryKeys = {
+  workspace: {
+    all: ['workspaces'] as const,
+    detail: (id: string) => ['workspace', id] as const,
+    domain: (id: string) => ['workspace', id, 'domain'] as const
+  },
+  domain: {
+    byAgent: (agentId: string) => ['domain', agentId] as const
+  }
+};
+
+// ✅ Mutations avec mise à jour cache
+onSuccess: (newData) => {
+  queryClient.setQueryData(queryKey, newData);
+}
+```
+
+## 📊 PERFORMANCE FRONTEND
+- ✅ **useCallback** pour handlers avec dépendances
+- ✅ **useMemo** pour calculs coûteux uniquement
+- ✅ **React.memo** pour composants avec props stables
+- ✅ **React.lazy** pour gros composants
+
+## 📱 MOBILE & RESPONSIVE
+- ✅ **Mobile-first** : Design responsive obligatoire
+- ✅ **Touch targets** : Min 44px pour mobile
+- ✅ **Text scaling** : Support tailles système
+- ✅ **Loading states** : Skeleton loaders appropriés
+- ✅ **Images** : Formats optimisés (WebP priorité)
+- ✅ **Lazy loading** : Composants hors viewport
+- ✅ **Bundle size** : React.lazy pour gros modules
+- ✅ **Cache** : Persistance React Query locale
+
+## 🔧 ERROR HANDLING FRONTEND
+```typescript
+// ✅ Gestion dans hooks
+try {
+  const result = await service.method();
+  return result;
+} catch (error) {
+  throw error; // Laisser React Query gérer
+}
+
+// ✅ Display dans composants
+if (isError) {
+  return <ErrorComponent error={error} />;
+}
+```
+
+## 🏗️ ARCHITECTURE MODULES FRONTEND OBLIGATOIRE
+
+### ✅ Structure modules : L'essentiel tourne autour des modules (comme des apps)
+```
+client/
+├── modules/                    # Modules = mini-apps complètes
+│   ├── core/
+│   │   ├── BaseModule.tsx      # Interface de base pour tous les modules
+│   │   └── ModuleRegistry.ts   # Registre centralisé des modules
+│   ├── ChatModule.tsx          # Module Chat IA
+│   ├── SavCustomAgentModule.tsx    # Module Agent SAV
+│   ├── SalesCustomAgentModule.tsx  # Module Agent Sales
+│   ├── ImageGenerationModule.tsx   # Module Génération d'images
+│   ├── CampaignModule.tsx          # Module Campagnes
+│   ├── ReplyModule.tsx             # Module Réponses automatiques
+│   └── BaseCustomAgentModule.tsx   # Module de base pour agents
+├── components/                 # Composants par domaine (utilisés par modules)
+│   ├── chat/                   # Composants spécifiques au chat
+│   ├── custom-agent/           # Composants pour agents personnalisés
+│   ├── campaign/               # Composants pour campagnes
+│   ├── reply/                  # Composants pour réponses
+│   ├── ui/                     # Composants UI réutilisables
+│   └── module/                 # Composants de structure des modules
+└── app/                        # Routes Next.js
+    └── dashboard/
+        └── employees/[name]/[module]/page.tsx  # Route dynamique pour modules
+```
+
+### ✅ Pattern Module obligatoire
+```typescript
+// ✅ Chaque module doit implémenter ModuleComponent
+import { createModule, ModuleComponent } from './core/BaseModule';
+
+const MyModule: ModuleComponent = ({ employee, onModuleChange }) => {
+  // ✅ Interface standardisée pour tous les modules
+  return (
+    <div>
+      {/* Contenu du module utilisant des composants */}
+    </div>
+  );
+};
+
+export default createModule(MyModule);
+```
+
+### ✅ Registry des modules
+```typescript
+// ✅ Pattern détecté dans ModuleRegistry.ts
+const modulesComponents: Record<string, ModuleComponent> = {
+  'chat': ChatModule,
+  'sav-custom-agent': SavCustomAgentModule,
+  'sales-custom-agent': SalesCustomAgentModule,
+  'image-generation': ImageGenerationModule,
+  'campaign': CampaignModule,
+  'reply': ReplyModule
+};
+
+export const getModule = (moduleId: string): ModuleComponent | undefined => {
+  return modulesComponents[moduleId];
+};
+```
+
+### ✅ Route dynamique des modules
+```typescript
+// ✅ Pattern détecté dans page.tsx
+export default function EmployeeModulePage({ params }: PageProps) {
+  const moduleComponent = getModule(moduleId);
+  
+  if (moduleComponent) {
+    return <ActiveModule employee={employee} onModuleChange={handleModuleChange} />;
+  }
+  
+  // Fallback vers chat si module inexistant
+  router.push(`/dashboard/employees/${employeeName}/chat`);
+}
+```
+
+## 📁 ORGANISATION SERVICES FRONTEND OBLIGATOIRE
+
+### ✅ Structure directories services
+```
+client/services/
+├── api/           # Services métier connectés aux APIs externes
+│   ├── sessionService.ts      # Service IA/Chat (spécial FastAPI)
+│   ├── documentService.ts     # Gestion documents
+│   ├── customAgentService.ts  # Agents personnalisés
+│   ├── campaignService.ts     # Campagnes marketing
+│   ├── automationService.ts   # Automations
+│   └── firebase/             # Configuration Firebase
+│       ├── config.ts         # Configuration environnement
+│       ├── functions.ts      # Wrapper fonctions Firebase
+│       └── index.ts          # Exports centralisés
+└── local/         # Services utilitaires locaux (pas d'API)
+    ├── authenticationService.ts  # Auth + tokens + firewall
+    ├── dateService.ts           # Formatage dates
+    ├── fileProcessingService.ts # Validation fichiers
+    ├── mimeTypeService.ts       # Types MIME
+    └── dataExportService.ts     # Export données
+```
+
+### ✅ Règles placement services
+- ✅ **Services API** → `client/services/api/` : Connectés aux APIs (Firebase, FastAPI, externes)
+- ✅ **Services locaux** → `client/services/local/` : Utilitaires purs, pas d'appels réseau
+- ✅ **Configuration** → `client/services/api/firebase/` : Configuration environnement Firebase
+- ❌ **JAMAIS** mélanger local et API dans le même répertoire
+
+### ✅ Règles modules vs composants
+- ✅ **Modules** → `client/modules/` : Mini-apps complètes avec logique métier
+- ✅ **Composants** → `client/components/` : Composants réutilisables par domaine utilisés par les modules
+- ✅ **Routes** → `client/app/` : Routes Next.js qui chargent les modules dynamiquement
+- ❌ **JAMAIS** mélanger logique métier dans les composants (utiliser modules)
+
+## 🤖 SERVICE IA SPÉCIAL : sessionService.ts
+
+### ✅ SessionService - Service IA critique
+```typescript
+// ✅ Pattern spécial pour l'IA : connexion directe FastAPI
+export class SessionService {
+  // ✅ Constantes pour messages spéciaux
+  public static readonly SAVED_IMPORTANT_INFO_BDD = "saved_important_info:";
+  public static readonly SAVED_IMPORTANT_INFO_LIVE = "temp:saved_important_info";
+
+  // ✅ Streaming SSE obligatoire pour IA
+  static async createSessionAndSendMessage(
+    appName: string,
+    parts: (MessageText | MessageFile)[],
+    workspaceId: string,
+    sessionId: string
+  ): Promise<{ stream: ReadableStream }> {
+    // ✅ Appel direct FastAPI (pas Firebase)
+    const response = await fetch(`${SERVICE_URL.FASTAPI}/run_sse/new_session`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${idToken}`
+      },
+      body: JSON.stringify({
+        app_name: appName,
+        session_id: sessionId,
+        workspace_id: workspaceId,
+        new_message: { role: 'user', parts },
+        streaming: true
+      })
+    });
+    return { stream: response.body };
+  }
+}
+```
+
+### ✅ Patterns SessionService obligatoires
+- ✅ **FastAPI direct** : `SERVICE_URL.FASTAPI` pour IA (pas Firebase)
+- ✅ **Streaming SSE** : ReadableStream pour réponses temps réel
+- ✅ **Auth Bearer** : Token Firebase dans Authorization header
+- ✅ **Gestion partielle** : Messages `partial: true` pour streaming
+- ✅ **Constantes messages** : SAVED_IMPORTANT_INFO_* pour types spéciaux
+- ✅ **Error handling** : Timeout 20s + gestion erreurs stream
+
+### ✅ SSE Stream handling pattern
+```typescript
+// ✅ Pattern obligatoire pour gérer les streams IA
+static async handleSSEStream(
+  stream: ReadableStream,
+  onMessage: (message: Message) => void,
+  onComplete: (sessionId: string, workspaceId: string, titleSession: string) => void,
+  onError: (error: Error) => void
+) {
+  const reader = stream.getReader();
+  const decoder = new TextDecoder();
+  let buffer = '';
+  let currentMessage: Message | null = null;
+  let hasReceivedFirstMessage = false;
+
+  try {
+    while (true) {
+      const { value, done } = await reader.read();
+      if (done) break;
+
+      buffer += decoder.decode(value, { stream: true });
+      let boundary = buffer.indexOf("\n\n");
+      
+      while (boundary !== -1) {
+        const chunk = buffer.slice(0, boundary).trim();
+        buffer = buffer.slice(boundary + 2);
+
+        if (chunk.startsWith('data:')) {
+          const rawData = chunk.replace(/^data:\s*/, '');
+          const data = JSON.parse(rawData);
+          
+          // Gérer messages partiels et complets
+          if (data.partial) {
+            if (currentMessage) {
+              currentMessage.text += text;
+            } else {
+              currentMessage = {
+                id: data.id,
+                author: 'agent',
+                text: text,
+                timestamp: new Date(data.timestamp),
+                partial: true
+              };
+            }
+            onMessage(currentMessage);
+          }
+        }
+        boundary = buffer.indexOf("\n\n");
+      }
+    }
+  } finally {
+    reader.releaseLock();
+  }
+}
+```
+
+## 🔒 SERVICE AUTHENTIFICATION SPÉCIAL : authenticationService.ts
+
+### ✅ AuthenticationService - Service sécurité critique
+```typescript
+// ✅ Pattern spécial : Firewall + tokens + multi-environment
+export class AuthenticationService {
+  // ✅ Firewall obligatoire contre spam
+  const requestFirewall = new Map<string, FirewallEntry>();
+  const MAX_REQUESTS_PER_ENDPOINT = 10;
+  const FIREWALL_RESET_TIME = 10000; // 10 secondes
+  
+  // ✅ Wrapper sécurisé obligatoire
+  export async function callSecuredFunction<T>(
+    functionName: string,
+    workspaceId: string,
+    data?: any
+  ): Promise<T> {
+    // 1️⃣ Firewall check
+    if (!checkFirewall(functionName)) {
+      throw new Error(`🚨 PAREFEU: Trop de requêtes pour ${functionName}`);
+    }
+
+    // 2️⃣ Token workspace
+    const workspace_tokens = getStoredTokens();
+    const workspaceToken = workspace_tokens[workspaceId];
+
+    // 3️⃣ Appel Firebase avec token
+    const result = await callFirebaseFunction<T & { workspace_tokens?: WorkspaceTokenMap }>(
+      functionName, 
+      { ...data, workspaceToken: workspaceToken?.token || null }
+    );
+
+    // 4️⃣ Mise à jour tokens si reçus
+    if (result.workspace_tokens) {
+      storeTokens(result.workspace_tokens);
+    }
+
+    return result;
+  }
+}
+```
+
+### ✅ Patterns AuthenticationService obligatoires
+- ✅ **Firewall système** : Protection contre spam (10 req/10s par endpoint)
+- ✅ **Multi-environment** : URLs différentes dev/staging/prod
+- ✅ **Token management** : localStorage + workspace isolation
+- ✅ **Auto-logout** : Erreurs INVALID_TOKEN → déconnexion automatique
+- ✅ **Error notification** : ROLE_NOT_ALLOWED → notification utilisateur
+- ✅ **Cache clearing** : clearAllCache() sur déconnexion
+
+## 🌐 RÈGLES URLS ENVIRONNEMENTS
+
+
+### ✅ Règles URLs obligatoires
+- ✅ **Firebase dev** : us-central1 (émulateurs)
+- ✅ **Firebase prod** : europe-west1 (production)
+- ✅ **FastAPI local** : 127.0.0.1:8080 si NEXT_PUBLIC_FASTAPI_ENV=local
+- ✅ **FastAPI staging** : Google Cloud Run staging
+- ✅ **FastAPI prod** : api.demo-project.com
+- ❌ **JAMAIS** hardcoder URLs sans vérification environnement
+
+## 🪝 HOOKS RULES STRICTES
+
+### ✅ UN HOOK DOIT ÊTRE UN HOOK
+- ✅ **React Hook uniquement** : Pas de classes, pas de fonctions utilitaires déguisées
+- ✅ **React Query OBLIGATOIRE** : Pas de useState/useEffect manuels pour données API
+- ✅ **Return organisé** : Data/Loading states/Actions/Utils
+- ✅ **useCallback stabilisé** : TOUS les handlers DOIVENT être stabilisés
+
+### ❌ ANTI-PATTERNS HOOKS INTERDITS
+```typescript
+// ❌ INTERDIT - Hook qui n'est pas un hook
+export function useCustomAgentNotifications() {
+  const [data, setData] = useState(); // ❌ État manuel
+  const [loading, setLoading] = useState();
+  
+  useEffect(() => { // ❌ Effect manuel pour API
+    fetchData().then(setData);
+  }, []);
+  
+  return { data, loading }; // ❌ Return non organisé
+}
+
+// ❌ INTERDIT - Handler non stabilisé
+const handleClick = () => { // ❌ Pas de useCallback
+  doSomething();
+};
+```
+
+### ✅ HOOK PATTERN CORRECT OBLIGATOIRE
+```typescript
+// ✅ CORRECT - Hook React Query
+export function useCustomAgentNotifications(customAgentId: string) {
+  const { currentWorkspaceId } = useWorkspaceContext();
+  const queryClient = useQueryClient();
+
+  // ✅ React Query pour données
+  const notificationsQuery = useQuery({
+    queryKey: queryKeys.customAgentNotifications(currentWorkspaceId, customAgentId),
+    queryFn: async () => {
+      const result = await CustomAgentNotificationService.getNotifications(currentWorkspaceId);
+      return result.notifications.filter(n => n.custom_agent_id === customAgentId);
+    },
+    staleTime: 0,
+    refetchOnMount: true,
+    placeholderData: (previousData) => previousData
+  });
+
+  // ✅ Mutations avec cache
+  const createOrUpdateMutation = useMutation({
+    mutationFn: ({ config }: { config: CustomAgentNotificationConfig }) =>
+      CustomAgentNotificationService.createOrUpdate(currentWorkspaceId, customAgentId, config),
+    onSuccess: () => {
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.customAgentNotifications(currentWorkspaceId, customAgentId)
+      });
+    }
+  });
+
+  // ✅ Handlers stabilisés avec useCallback
+  const createOrUpdateNotification = useCallback((config: CustomAgentNotificationConfig) => {
+    createOrUpdateMutation.mutate({ config });
+  }, [createOrUpdateMutation]);
+
+  const refresh = useCallback(async () => {
+    await queryClient.invalidateQueries({
+      queryKey: queryKeys.customAgentNotifications(currentWorkspaceId, customAgentId)
+    });
+  }, [currentWorkspaceId, customAgentId, queryClient]);
+
+  // ✅ Return organisé par catégorie
+  return {
+    // Data
+    notification: notificationsQuery.data?.[0] || null,
+    notifications: notificationsQuery.data || [],
+    // Loading states
+    isLoading: notificationsQuery.isLoading,
+    isError: notificationsQuery.isError,
+    error: notificationsQuery.error,
+    // Actions
+    createOrUpdateNotification,
+    isCreatingOrUpdating: createOrUpdateMutation.isPending,
+    // Utils
+    refresh
+  };
+}
+```
+
+## 🪝 PATTERNS HOOKS DÉTECTÉS
+
+### ✅ Singleton managers dans hooks
+```typescript
+// ✅ Pattern détecté dans useAutomations.ts
+class RefreshTimeManager {
+  private static instance: RefreshTimeManager;
+  private lastRefreshTime: Date | null = null;
+
+  private constructor() {}
+
+  static getInstance(): RefreshTimeManager {
+    if (!RefreshTimeManager.instance) {
+      RefreshTimeManager.instance = new RefreshTimeManager();
+    }
+    return RefreshTimeManager.instance;
+  }
+}
+```
+
+### ✅ Configuration React Query spécifique
+```typescript
+// ✅ Pattern détecté : staleTime variables selon contexte
+const query = useQuery({
+  queryKey: queryKeys.domain(workspaceId),
+  queryFn: () => Service.method(workspaceId),
+  staleTime: 5 * 60 * 1000, // ✅ 5 min pour automations
+  retry: false, // ✅ Désactivé pour workspaces
+  placeholderData: (previousData) => previousData // ✅ TOUJOURS garder données
+});
+```
+
+### ✅ Cache management optimisé
+```typescript
+// ✅ Pattern détecté dans useCampaigns.ts
+const updateItemInCache = (updatedItem: ItemType) => {
+  queryClient.setQueryData<InfiniteData<ResponseType>>(
+    queryKey,
+    (old) => {
+      if (!old) return {
+        pages: [{ items: [updatedItem], hasMore: false, nextCursor: null }],
+        pageParams: [undefined]
+      };
+      return {
+        ...old,
+        pages: old.pages.map(page => ({
+          ...page,
+          items: page.items.map(item => 
+            item.id === updatedItem.id ? updatedItem : item
+          )
+        }))
+      };
+    }
+  );
+};
+```
+
+## ⚛️ PATTERNS COMPOSANTS DÉTECTÉS
+
+### ✅ Enum local dans composants
+```typescript
+// ✅ Pattern détecté dans CampaignCreation.tsx
+enum Step {
+  WELCOME = 'welcome',
+  IMAGES = 'images', 
+  DESCRIPTION = 'description',
+  GENERATION = 'generation'
+}
+```
+
+### ✅ Interfaces props explicites
+```typescript
+// ✅ Pattern obligatoire détecté
+interface ComponentProps {
+  onBack: () => void;
+  employeeRgba: string;
+  onCampaignGenerated: (campaign: Campaign) => void;
+}
+
+export const Component: React.FC<ComponentProps> = ({ 
+  onBack, 
+  employeeRgba, 
+  onCampaignGenerated 
+}) => {
+  // Implementation
+};
+```
+
+## 🏛️ PATTERNS CONTEXTS DÉTECTÉS
+
+### ✅ Setters stabilisés obligatoires
+```typescript
+// ✅ Pattern détecté dans ChatParamsContext.tsx
+const stableSetValue = React.useCallback((value: string | null) => {
+  setValue(value);
+}, []);
+
+return (
+  <Context.Provider value={{ 
+    value, 
+    setValue: stableSetValue // ✅ TOUJOURS setter stabilisé
+  }}>
+    {children}
+  </Context.Provider>
+);
+```
+
+## 🎨 PATTERNS UI DÉTECTÉS
+
+### ✅ Utilisation React Icons
+```typescript
+// ✅ Pattern détecté dans tous les composants
+import { RiAttachment2, RiBrainLine } from 'react-icons/ri';
+import { FiImage, FiFile, FiShield, FiAlertCircle } from 'react-icons/fi';
+
+// Usage avec classes Tailwind
+<RiAttachment2 className="w-5 h-5" />
+```
+
+### ✅ DateService usage
+```typescript
+// ✅ Pattern détecté dans ChatInterface.tsx
+import { DateService } from '@/services/local/dateService';
+
+const formattedDate = DateService.formatChatDate(date);
+```
+
+### ✅ FileProcessingService usage
+```typescript
+// ✅ Pattern détecté
+import { FileProcessingService, FileValidationConfigType } from '@/services/local/fileProcessingService';
+
+const result = await FileProcessingService.process(file, {
+  preset: FileValidationConfigType.documentBrain
+});
+```
+
+## 🔄 NOUVELLES RÈGLES IDENTIFIÉES
+
+### ⚠️ Singleton managers dans hooks autorisés
+- ✅ **RefreshTimeManager pattern** : Acceptable pour gérer l'état persistant dans hooks
+- ✅ **getInstance() method** : Pattern singleton acceptable dans hooks spécifiques
+
+### ⚠️ Configuration React Query adaptative
+- ✅ **staleTime variable** : Adapter selon le contexte (5min automations, 0 workspaces)
+- ✅ **retry: false** : Désactiver pour certaines queries critiques
+- ✅ **placeholderData mandatory** : TOUJOURS garder données pendant refetch
+
+### ⚠️ Cache management patterns obligatoires
+- ✅ **InfiniteData handling** : Pattern spécifique pour pagination
+- ✅ **Fallback data structure** : TOUJOURS prévoir structure vide si pas de données
+
+## 📅 RÈGLES DATE MANAGEMENT OBLIGATOIRES
+
+### ✅ DateService centralisé pour toutes les dates
+```typescript
+// ✅ TOUJOURS utiliser DateService
+import { DateService } from '@/services/local/dateService';
+
+// ❌ INTERDIT - Créer des fonctions de date locales
+const formatDate = (date: Date) => { /* ... */ };
+
+// ✅ OBLIGATOIRE - Utiliser le service centralisé
+const formattedDate = DateService.formatChatDate(date);
+```
+
+### ✅ Normalisation dates pour cache React Query
+```typescript
+// ✅ Pattern pour éviter requêtes multiples inutiles
+import { DateService } from '@/services/local/dateService';
+
+// Normaliser les dates à minuit GMT pour cache stable
+const normalizedDate = DateService.normalizeToMidnightGMT(date);
+
+// Dates normalisées pour clé de cache stable
+const normalizedStart = DateService.normalizeToMidnightGMT(startDate);
+const normalizedEnd = DateService.normalizeToMidnightGMT(endDate);
+
+// Query avec clé stable
+const query = useQuery({
+  queryKey: queryKeys.domain.stats(id, normalizedStart, normalizedEnd), // ✅ Clé stable
+  // ❌ INTERDIT: queryKey avec Date objects directs
+  // queryKey: queryKeys.domain.stats(id, startDate, endDate)
+});
+```
+
+### ✅ Services de date disponibles dans DateService
+```typescript
+// ✅ Méthodes disponibles à utiliser
+DateService.formatChatDate(date)           // Chat/sessions
+DateService.formatSessionDate(date)        // Historique sessions  
+DateService.formatTimeSince(date)          // "Il y a X min/h/jours"
+DateService.convertGMTToLocal(gmtTime)     // GMT -> local
+DateService.convertLocalToGMT(localTime)   // Local -> GMT
+DateService.normalizeToMidnightGMT(date)   // Cache normalisé
+```
+
+### ❌ Anti-patterns date interdits
+```typescript
+// ❌ INTERDIT - Date locale sans normalisation
+const query = useQuery({
+  queryKey: ['stats', new Date()], // Cache cassé
+});
+
+// ❌ INTERDIT - Formatage date local
+const formatDate = (date: Date) => {
+  return date.toLocaleDateString(); // Utiliser DateService
+};
+
+// ❌ INTERDIT - Clés cache instables
+const queryKey = [agentId, dateRange.start, dateRange.end]; // Objets Date
+```
+
+### 🎯 Cache performance optimisé
+- ✅ **Dates normalisées** : Même période = même clé cache
+- ✅ **GMT+0 minuit** : `00:00:00.000Z` pour cohérence
+- ✅ **Clé format** : `"2024-01-15_2024-02-15"` (stable)
+- ✅ **StaleTime adapté** : 12h pour stats, 0 pour données temps réel

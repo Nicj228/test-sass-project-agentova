@@ -1,0 +1,174 @@
+---
+description: Règles globales du projet (conventions, types, workspace, métier)
+globs: ["**/*.ts", "**/*.tsx"]
+alwaysApply: true
+---
+
+# 🌍 RÈGLES GLOBALES COMPLÈTES
+
+## 🔄 WORKSPACE-CENTRIC RULES NON-NÉGOCIABLES
+- ✅ **workspace_id** TOUJOURS en premier paramètre
+- ✅ **WHERE workspace_id = $1** dans TOUTES les requêtes
+- ✅ **Token validation** à chaque appel API
+- ✅ **Isolation complète** entre workspaces
+- ✅ **getCurrentWorkspaceId** via useWorkspaceContext()
+- ✅ **WORKSPACE_ROLES.ADMIN** pour actions sensibles
+- ✅ **WORKSPACE_ROLES.EDITOR** pour actions standard
+- ✅ **Vérification rôles** avant actions critiques
+- ✅ **Error handling** pour permissions insuffisantes
+
+## 🚨 RÈGLES CRITIQUES ABSOLUES - VIOLATIONS BLOQUANTES
+
+### ⚠️ ENUM OBLIGATOIRE - JAMAIS DE STRINGS
+```typescript
+// ❌ INTERDIT - Types avec strings
+type Status = 'pending' | 'completed' | 'failed';
+
+// ✅ OBLIGATOIRE - Enum pour traçabilité
+enum Status {
+  PENDING = 'pending',
+  COMPLETED = 'completed', 
+  FAILED = 'failed'
+}
+```
+
+### 📍 TYPES DANS SHARED/TYPES.TS
+- ✅ **Tous les types** dans `shared/types.ts`
+- ✅ **Types services** dans le service lui-même SEULEMENT si spécifique
+- ❌ **JAMAIS** de types dans repositories
+- ✅ **Enums** systématiques pour valeurs fixes
+
+### 🎨 ICONES & ASSETS RULES
+- ❌ **JAMAIS** de SVG en dur dans le code
+- ✅ **TOUJOURS** utiliser React Icons : https://react-icons.github.io/react-icons/
+- ✅ **Import** : `import { RiImageAddLine } from 'react-icons/ri'`
+- ✅ **Usage** : `<RiImageAddLine className="w-5 h-5" />`
+
+### 🕐 DATE MANAGEMENT RULES
+- ✅ **TOUJOURS** utiliser `DateService` centralisé
+- ✅ **Methods** : `formatChatDate()`, `formatSessionDate()`, `normalizeToMidnightGMT()`
+- ✅ **Cache normalisé** : Dates à minuit GMT pour éviter requêtes multiples
+- ❌ **JAMAIS** créer de nouvelles fonctions de date
+- ❌ **JAMAIS** utiliser Date objects directement dans queryKeys
+
+### 📁 SERVICES LOCAUX EXISTANTS À UTILISER
+```typescript
+// ✅ Services à connaitre AVANT de créer quoi que ce soit
+import { DateService } from '@/services/local/dateService';
+import { FileProcessingService, FileValidationConfigType } from '@/services/local/fileProcessingService';
+import { getFileType, getFileIcon } from '@/services/local/mimeTypeService';
+import { DataExportService, EXPORT_FORMATS } from '@/services/local/dataExportService';
+import { callSecuredFunction, callSecuredSSEFunction } from '@/services/local/authenticationService';
+
+// ✅ TOUJOURS vérifier ces services avant création
+```
+
+## 📝 CONVENTIONS STRICTES
+
+### Nommage Files
+- Services: `{domain}Service.ts` (ex: `replyCommentService.ts`)
+- Hooks: `use{Domain}.ts` (ex: `useReplyComments.ts`)
+- Components: `PascalCase.tsx` (ex: `ReplyInteraction.tsx`)
+- Repositories: `{entity}Repository.ts` (ex: `replyCommentRepository.ts`)
+- Types: Interfaces en `PascalCase`
+- Constants: `UPPER_SNAKE_CASE`
+
+### TypeScript Rules Globales
+- ✅ **Props TOUJOURS typées** avec interface explicite
+- ✅ **Pas de `any`** - utiliser `unknown` si nécessaire
+- ✅ **Types partagés** de `shared/types.ts`
+- ✅ **Enums** pour valeurs fixes (`AutomationName`, `WorkspaceRole`)
+- ✅ **Types de retour** explicites pour fonctions publiques
+- ✅ **Generics** pour réutilisabilité
+
+## 🎯 RÈGLES SPÉCIFIQUES MÉTIER
+
+### Custom Agents Rules
+- ✅ **Types CustomAgent** : Utiliser `SharedCustomAgent` + extension client si nécessaire
+- ✅ **CustomAgentType** : SAV/SALES obligatoire avec enum
+- ✅ **Documents liés** : Relation via `CustomAgentDocument` 
+- ✅ **Sessions** : Extension côté client avec `sessions?: Session[]`
+- ✅ **Configuration** : `encodeCustomAgentConfig` / `decodeCustomAgentConfig`
+
+### OAuth & Automation Rules
+- ✅ **OAuthProvider** : Enum strict (instagram, facebook, google, etc.)
+- ✅ **AutomationName** : Enum strict (messages, comments)
+- ✅ **Provider isolation** : Un token = un provider + un workspace
+- ✅ **Webhooks** : Pattern Meta (200 immédiat + traitement async)
+- ✅ **Token refresh** : Gestion automatique avec `refreshTokenIfNeeded`
+
+### Campaign Rules
+- ✅ **Structure** : Campaign + CampaignPost[] obligatoire
+- ✅ **Images** : MessageFileInline[] avec validation types
+- ✅ **Providers** : Support multi-plateforme (Instagram/Facebook)
+- ✅ **États** : Draft/Published avec timestamps
+- ✅ **Pagination** : CampaignCursor pour grandes listes
+
+### Document & Knowledge Rules
+- ✅ **Types documents** : info/url/file/image avec enum
+- ✅ **Upload progression** : UploadProgress + UploadStep
+- ✅ **Validation taille** : Selon type de fichier
+- ✅ **Storage** : Wasabi S3 avec organisation workspace
+- ✅ **Corpus integration** : Liens avec custom agents
+
+### Lead Management Rules
+- ✅ **Champs dynamiques** : LeadFormField[] configurable
+- ✅ **Types supportés** : text/email/tel/textarea
+- ✅ **Validation** : Required fields + formats
+- ✅ **Agent association** : Lead → CustomAgent obligatoire
+- ✅ **Données RGPD** : Anonymisation possible
+
+### Image Generation Rules
+- ✅ **Types génération** : simple/imageToImage/inpaint/background
+- ✅ **Paramètres** : BaseGenerationParams + spécifiques
+- ✅ **Formats** : Support WebP/PNG/JPEG
+- ✅ **Ratios** : AspectRatio avec validation
+- ✅ **Upload temporaire** : Auto-suppression R2
+
+### Session & Chat Rules
+- ✅ **Structure messages** : author (user/agent) + timestamp
+- ✅ **Types contenu** : text + files optionnels
+- ✅ **Outils** : usedTools tracking
+- ✅ **États** : isError + partial pour streaming
+- ✅ **Pagination** : SessionCursor avec limites
+
+### Notification & Reply Rules
+- ✅ **Auto-reply** : first_messages + matching_messages
+- ✅ **Pattern matching** : match_phrase → reply_message
+- ✅ **Multi-plateforme** : Instagram + Facebook comments
+- ✅ **Délais** : Max 7 jours pour commentaires
+- ✅ **Messages privés** : Auto-redirect vers agent
+
+
+
+## 🌿 GIT WORKFLOW RULES
+- ✅ **TOUJOURS** créer une nouvelle branche pour toute modification
+
+## 🧹 CODE QUALITY RULES
+- ✅ **Variables utilisées** - Supprimer variables non utilisées
+- ✅ **Imports organisés** - Supprimer imports inutiles
+- ✅ **Validation push** - Fichier validation post-commit
+- ✅ **Enum tracing** - Meilleure traçabilité que strings
+
+## 🔍 PRE-DEVELOPMENT CHECKLIST
+1. **Enum check** - Créer enums pour toutes valeurs fixes
+2. **Types check** - Ajouter dans shared/types.ts
+3. **Services check** - Vérifier services locaux existants
+4. **Date check** - Utiliser DateService pour dates
+5. **Icon check** - Utiliser React Icons
+6. **Validation check** - Créer fichier validation séparé
+7. **Repository check** - Isolation workspace obligatoire
+
+## 🎯 SANCTIONS POUR NON-RESPECT
+- **Erreur critique** : Refus PR automatique
+- **Pattern non respecté** : Correction obligatoire
+- **Sécurité** : Review sécurité avant merge
+- **Performance** : Benchmarks obligatoires
+
+## 🔍 POINTS DE CONTRÔLE OBLIGATOIRES
+1. **Services** : Méthodes statiques + workspaceId premier
+2. **Firebase** : Validation auth + workspace + rôles
+3. **Types** : Props typées + shared types utilisés
+4. **Sécurité** : Pas de hardcoding + validation inputs
+5. **Performance** : useCallback + React Query optimisé
+
