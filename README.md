@@ -15,6 +15,11 @@ Ce projet contient **volontairement des erreurs** pour évaluer vos compétences
 ### 3️⃣ **REGARDER LA FORMATION**
 **🎥 Vidéo obligatoire** : [Formation Cursor](https://www.youtube.com/watch?v=6fBHvKTYMCM)
 
+### 4️⃣ **RÉALISER LE TEST**
+
+**🚀 Une fois prêt, lancez-vous dans le test technique**.
+💡 Petit conseil : assurez-vous d’avoir bien maîtrisé les documents, et la vidéo avant de démarrer l’enregistrement de votre test, pour éviter d’être en pleine découverte en direct.
+
 ## 🚨 **ATTENTION : LISEZ TRÈS ATTENTIVEMENT LES CONSIGNES**
 
 **Tous les détails importants sont dans les consignes complètes. Une lecture superficielle = échec du test.**
