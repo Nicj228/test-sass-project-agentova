@@ -15,7 +15,10 @@ Si vous préférez coder manuellement les fonctionnalités, ce poste n'est pas f
 
 ## 🎥 VIDÉO DE FORMATION
 
+La partie de la vidéo sur les MCP peut-être skip elle est pas importante dans ce test
+
 **Vidéo obligatoire à regarder** : [Formation Cursor](https://www.youtube.com/watch?v=6fBHvKTYMCM)
+
 
 **Points complémentaires essentiels** (en plus de la vidéo) :
 
