@@ -1,5 +1,4 @@
-import { Pool } from '../node_modules/@types/pg';
-import { types } from '../node_modules/@types/pg';
+import { Pool, types } from 'pg';
 
 // Configuration des parsers de types PostgreSQL pour les dates
 types.setTypeParser(1114, (val: string) => new Date(val));

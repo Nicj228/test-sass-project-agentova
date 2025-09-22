@@ -5,6 +5,8 @@ import { validateRequiredFields, isSuccess, handleError } from '../utils/validat
 import { createResponseWithTokens } from '../../shared/responses.js';
 import { getTextRepository } from '../../db/repositories/index.js';
 import { WORKSPACE_ROLES } from '../../../shared/types.js';
+import { databaseUrlProd, jwtWorkspaceSecret } from '../main.js';
+import { validateTextData, toInvalidInputError } from '../utils/validation/textValidation.js';
 
 /**
  * Service de gestion des textes
@@ -15,10 +17,15 @@ import { WORKSPACE_ROLES } from '../../../shared/types.js';
  * Créer un nouveau texte
  */
 export const createText = onCall({
+  secrets: [databaseUrlProd, jwtWorkspaceSecret],
   memory: '512MiB',
   timeoutSeconds: 60
 }, async (request) => {
   try {
+    // ✅ Ensure DB URL from secret is available at runtime
+    if (!process.env.DATABASE_URL) {
+      process.env.DATABASE_URL = databaseUrlProd.value();
+    }
     // ✅ 1. Validation auth OBLIGATOIRE
     const authResponse = validateAuth(request.auth);
     if (!isSuccess(authResponse)) return authResponse;
@@ -42,12 +49,10 @@ export const createText = onCall({
     const { workspace_id, workspace_tokens } = validationResult;
     const response = createResponseWithTokens(workspace_tokens);
 
-    // ✅ 4. Validation métier spécifique
-    if (content.length > 1000) {
-      return response.error({
-        code: 'INVALID_INPUT',
-        message: 'Le contenu ne peut pas dépasser 1000 caractères'
-      });
+    // ✅ 4. Validation métier spécifique (fichier dédié)
+    const textValidation = validateTextData({ title, content });
+    if (!textValidation.valid) {
+      return response.error(toInvalidInputError(textValidation.errors));
     }
 
     // ✅ 5. Logique métier via repository
@@ -75,10 +80,15 @@ export const createText = onCall({
  * Récupérer tous les textes d'un workspace
  */
 export const getTexts = onCall({
+  secrets: [databaseUrlProd, jwtWorkspaceSecret],
   memory: '512MiB',
   timeoutSeconds: 60
 }, async (request) => {
   try {
+    // ✅ Ensure DB URL from secret is available at runtime
+    if (!process.env.DATABASE_URL) {
+      process.env.DATABASE_URL = databaseUrlProd.value();
+    }
     // ✅ 1. Validation auth OBLIGATOIRE
     const authResponse = validateAuth(request.auth);
     if (!isSuccess(authResponse)) return authResponse;
@@ -121,10 +131,15 @@ export const getTexts = onCall({
  * Supprimer un texte
  */
 export const deleteText = onCall({
+  secrets: [databaseUrlProd, jwtWorkspaceSecret],
   memory: '512MiB',
   timeoutSeconds: 60
 }, async (request) => {
   try {
+    // ✅ Ensure DB URL from secret is available at runtime
+    if (!process.env.DATABASE_URL) {
+      process.env.DATABASE_URL = databaseUrlProd.value();
+    }
     // ✅ 1. Validation auth OBLIGATOIRE
     const authResponse = validateAuth(request.auth);
     if (!isSuccess(authResponse)) return authResponse;

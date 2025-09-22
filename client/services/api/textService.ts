@@ -1,4 +1,4 @@
-import { callSecuredFunction } from '@/services/local/authenticationService';
+import { callSecuredFunction, WorkspaceTokenMap } from '@/services/local/authenticationService';
 
 /**
  * Service de gestion des textes côté client
@@ -22,44 +22,30 @@ export interface CreateTextRequest {
 
 export interface TextsResponse {
   texts: TextType[];
+  workspace_tokens?: WorkspaceTokenMap;
 }
 
 export interface TextResponse {
   text: TextType;
+  workspace_tokens?: WorkspaceTokenMap;
+}
+
+export interface DeleteResponse {
+  deleted: boolean;
+  workspace_tokens?: WorkspaceTokenMap;
 }
 
 export class TextService {
   /**
-   * Créer un nouveau texte
-   * 🔧 VERSION DEMO - Fonction fantôme qui simule la création
+   * Créer un nouveau texte (pattern service statique + secured wrapper)
    */
-  async createText(
+  static async createText(
     workspaceId: string,
     data: CreateTextRequest
   ): Promise<TextType> {
-    try {
-      // 🔧 FONCTION FANTÔME - Simule un appel API
-      console.log('📝 [DEMO] Création texte:', data);
-      
-      // Simuler un délai d'API
-      await new Promise(resolve => setTimeout(resolve, 500));
-      
-      // Retourner un texte simulé
-      const mockText: TextType = {
-        id: `text-${Date.now()}`,
-        workspace_id: workspaceId,
-        title: data.title || 'Sans titre',
-        content: data.content,
-        created_by: 'demo-user-123',
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString()
-      };
-      
-      return mockText;
-    } catch (error) {
-      console.error('Erreur création texte:', error);
-      throw error;
-    }
+    // ✅ Envoi des données au serveur via fonction sécurisée
+    const res = await callSecuredFunction<TextResponse>('createText', workspaceId, data);
+    return res.text;
   }
 
   /**
@@ -68,44 +54,9 @@ export class TextService {
    */
   static async getTexts(workspaceId: string): Promise<TextType[]> {
     try {
-      // 🔧 FONCTION FANTÔME - Simule un appel API
-      console.log('📋 [DEMO] Récupération textes pour workspace:', workspaceId);
-      
-      // Simuler un délai d'API
-      await new Promise(resolve => setTimeout(resolve, 300));
-      
-      // Retourner des textes simulés
-      const mockTexts: TextType[] = [
-        {
-          id: 'text-1',
-          workspace_id: workspaceId,
-          title: 'Premier texte de démonstration',
-          content: 'Ceci est un exemple de texte enregistré dans le système. Il sert à tester l\'architecture et les patterns de développement.',
-          created_by: 'demo-user-123',
-          created_at: new Date(Date.now() - 86400000).toISOString(), // Hier
-          updated_at: new Date(Date.now() - 86400000).toISOString()
-        },
-        {
-          id: 'text-2',
-          workspace_id: workspaceId,
-          title: 'Deuxième exemple',
-          content: 'Un autre texte pour montrer la liste et les fonctionnalités CRUD de base.',
-          created_by: 'demo-user-123',
-          created_at: new Date(Date.now() - 3600000).toISOString(), // Il y a 1h
-          updated_at: new Date(Date.now() - 3600000).toISOString()
-        },
-        {
-          id: 'text-3',
-          workspace_id: workspaceId,
-          title: 'Test technique',
-          content: 'Ce texte démontre l\'utilisation des services, hooks et composants selon les règles d\'architecture Agentova.',
-          created_by: 'demo-user-123',
-          created_at: new Date().toISOString(), // Maintenant
-          updated_at: new Date().toISOString()
-        }
-      ];
-      
-      return mockTexts;
+      // ✅ Requête serveur (réelle)
+      const res = await callSecuredFunction<TextsResponse>('getTexts', workspaceId, {});
+      return res.texts;
     } catch (error) {
       console.error('Erreur récupération textes:', error);
       throw error;
@@ -121,14 +72,9 @@ export class TextService {
     textId: string
   ): Promise<boolean> {
     try {
-      // 🔧 FONCTION FANTÔME - Simule un appel API
-      console.log('🗑️ [DEMO] Suppression texte:', textId);
-      
-      // Simuler un délai d'API
-      await new Promise(resolve => setTimeout(resolve, 400));
-      
-      // Toujours réussir en mode demo
-      return true;
+      // ✅ Requête serveur (réelle)
+      const res = await callSecuredFunction<DeleteResponse>('deleteText', workspaceId, { textId });
+      return Boolean(res.deleted ?? false);
     } catch (error) {
       console.error('Erreur suppression texte:', error);
       throw error;
@@ -145,24 +91,9 @@ export class TextService {
     data: Partial<CreateTextRequest>
   ): Promise<TextType> {
     try {
-      // 🔧 FONCTION FANTÔME - Simule un appel API
-      console.log('✏️ [DEMO] Mise à jour texte:', textId, data);
-      
-      // Simuler un délai d'API
-      await new Promise(resolve => setTimeout(resolve, 450));
-      
-      // Retourner un texte mis à jour simulé
-      const mockUpdatedText: TextType = {
-        id: textId,
-        workspace_id: workspaceId,
-        title: data.title || 'Titre mis à jour',
-        content: data.content || 'Contenu mis à jour',
-        created_by: 'demo-user-123',
-        created_at: new Date(Date.now() - 86400000).toISOString(),
-        updated_at: new Date().toISOString() // Maintenant
-      };
-      
-      return mockUpdatedText;
+      // ✅ Requête serveur (réelle)
+      const res = await callSecuredFunction<TextResponse>('updateText', workspaceId, { textId, ...data });
+      return res.text;
     } catch (error) {
       console.error('Erreur mise à jour texte:', error);
       throw error;

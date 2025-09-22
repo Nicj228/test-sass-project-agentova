@@ -1,105 +1,24 @@
-import { AutomationDiscussionRepository } from './automationDiscussionRepository';
-import { AutomationRepository } from './automationRepository';
-import { CampaignRepository } from './campaignRepository';
-import { CustomAgentRepository } from './customAgentRepository';
-import { CustomAgentNotificationRepository } from './customAgentNotificationRepository';
-import { ImageGenerationRepository } from './imageGenerationRepository';
-import { OAuthTokenRepository } from './oauthTokenRepository';
-import { SessionRepository } from './sessionRepository';
-import { WorkspaceDocumentRepository } from './workspaceDocumentRepository';
-import { WorkspaceInvitationRepository } from './workspaceInvitationRepository';
-import { WorkspaceRepository } from './workspaceRepository';
-import { ReplyCommentRepository } from './replyCommentRepository.js';
-import { LeadRepository } from './leadRepository';
-import { InboxStatesRepository } from './inboxStatesRepository';
 import { TextRepository } from './textRepository.js';
+import { CommentRepository } from './commentRepository.js';
+import { WorkspaceRepository } from './workspaceRepository.js';
 
-// Singleton instances - on les déclare comme undefined pour éviter l'initialisation au build
-let automationDiscussionRepo: AutomationDiscussionRepository | undefined;
-let automationRepo: AutomationRepository | undefined;
-let campaignRepo: CampaignRepository | undefined;
-let customAgentRepo: CustomAgentRepository | undefined;
-let customAgentNotificationRepo: CustomAgentNotificationRepository | undefined;
-let imageGenerationRepo: ImageGenerationRepository | undefined;
-let oauthTokenRepo: OAuthTokenRepository | undefined;
-let sessionRepo: SessionRepository | undefined;
-let workspaceDocumentRepo: WorkspaceDocumentRepository | undefined;
-let workspaceInvitationRepo: WorkspaceInvitationRepository | undefined;
-let workspaceRepo: WorkspaceRepository | undefined;
-let replyCommentRepository: ReplyCommentRepository | null = null;
-let leadRepository: LeadRepository | undefined;
-let inboxStatesRepo: InboxStatesRepository | undefined;
+// Singleton minimal pour le projet de test
 let textRepo: TextRepository | undefined;
+let commentRepo: CommentRepository | undefined;
+let workspaceRepo: WorkspaceRepository | undefined;
 
-// Getters with lazy initialization
-export function getAutomationDiscussionRepository(): AutomationDiscussionRepository {
-  if (!automationDiscussionRepo) {
-    automationDiscussionRepo = new AutomationDiscussionRepository();
+export function getTextRepository(): TextRepository {
+  if (!textRepo) {
+    textRepo = new TextRepository();
   }
-  return automationDiscussionRepo;
+  return textRepo;
 }
 
-export function getAutomationRepository(): AutomationRepository {
-  if (!automationRepo) {
-    automationRepo = new AutomationRepository();
+export function getCommentRepository(): CommentRepository {
+  if (!commentRepo) {
+    commentRepo = new CommentRepository();
   }
-  return automationRepo;
-}
-
-export function getCampaignRepository(): CampaignRepository {
-  if (!campaignRepo) {
-    campaignRepo = new CampaignRepository();
-  }
-  return campaignRepo;
-}
-
-export function getCustomAgentRepository(): CustomAgentRepository {
-  if (!customAgentRepo) {
-    customAgentRepo = new CustomAgentRepository();
-  }
-  return customAgentRepo;
-}
-
-export function getCustomAgentNotificationRepository(): CustomAgentNotificationRepository {
-  if (!customAgentNotificationRepo) {
-    customAgentNotificationRepo = new CustomAgentNotificationRepository();
-  }
-  return customAgentNotificationRepo;
-}
-
-export function getImageGenerationRepository(): ImageGenerationRepository {
-  if (!imageGenerationRepo) {
-    imageGenerationRepo = new ImageGenerationRepository();
-  }
-  return imageGenerationRepo;
-}
-
-export function getOAuthTokenRepository(): OAuthTokenRepository {
-  if (!oauthTokenRepo) {
-    oauthTokenRepo = new OAuthTokenRepository();
-  }
-  return oauthTokenRepo;
-}
-
-export function getSessionRepository(): SessionRepository {
-  if (!sessionRepo) {
-    sessionRepo = new SessionRepository();
-  }
-  return sessionRepo;
-}
-
-export function getWorkspaceDocumentRepository(): WorkspaceDocumentRepository {
-  if (!workspaceDocumentRepo) {
-    workspaceDocumentRepo = new WorkspaceDocumentRepository();
-  }
-  return workspaceDocumentRepo;
-}
-
-export function getWorkspaceInvitationRepository(): WorkspaceInvitationRepository {
-  if (!workspaceInvitationRepo) {
-    workspaceInvitationRepo = new WorkspaceInvitationRepository();
-  }
-  return workspaceInvitationRepo;
+  return commentRepo;
 }
 
 export function getWorkspaceRepository(): WorkspaceRepository {
@@ -109,52 +28,10 @@ export function getWorkspaceRepository(): WorkspaceRepository {
   return workspaceRepo;
 }
 
-export function getReplyCommentRepository(): ReplyCommentRepository {
-  if (!replyCommentRepository) {
-    replyCommentRepository = new ReplyCommentRepository();
-  }
-  return replyCommentRepository;
-}
-
-export function getLeadRepository(): LeadRepository {
-  if (!leadRepository) {
-    leadRepository = new LeadRepository();
-  }
-  return leadRepository;
-}
-
-export function getInboxStatesRepository(): InboxStatesRepository {
-  if (!inboxStatesRepo) {
-    inboxStatesRepo = new InboxStatesRepository();
-  }
-  return inboxStatesRepo;
-}
-
-export function getTextRepository(): TextRepository {
-  if (!textRepo) {
-    textRepo = new TextRepository();
-  }
-  return textRepo;
-}
-
-// Cleanup function for testing purposes
+// Fonction utilitaire de nettoyage (tests)
 export function clearRepositories(): void {
-  automationDiscussionRepo = undefined;
-  automationRepo = undefined;
-  campaignRepo = undefined;
-  customAgentRepo = undefined;
-  customAgentNotificationRepo = undefined;
-  imageGenerationRepo = undefined;
-  oauthTokenRepo = undefined;
-  sessionRepo = undefined;
-  workspaceDocumentRepo = undefined;
-  workspaceInvitationRepo = undefined;
-  workspaceRepo = undefined;
-  replyCommentRepository = null;
-  leadRepository = undefined;
-  inboxStatesRepo = undefined;
   textRepo = undefined;
-} 
+}
 
 
 

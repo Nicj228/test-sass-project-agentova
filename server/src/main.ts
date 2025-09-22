@@ -15,15 +15,24 @@ export const dbFirestore = getFirestore(app);
 export const auth = getAuth(app); 
 
 
-//configuration pour us-central1 le mode développement
-// car celui-ci marche uniquement aux us-central1
-setGlobalOptions({
-  region: "us-central",
-  concurrency: 1,
-});
+// Configuration région/mémoire selon environnement
+if (process.env.NODE_ENV === 'development') {
+  setGlobalOptions({
+    region: 'us-central1',
+    concurrency: 15,
+    memory: '512MiB'
+  });
+} else {
+  setGlobalOptions({
+    region: 'europe-west1',
+    concurrency: 10,
+    memory: '512MiB'
+  });
+}
 
 export const serverToken = defineSecret('SERVER_API_AGENT_TOKEN');
 export const jwtWorkspaceSecret = defineSecret('JWT_WORKSPACE_SECRET');
+export const databaseUrlProd = defineSecret('DATABASE_URL');
 
 
 export const SERVICE_URL = {

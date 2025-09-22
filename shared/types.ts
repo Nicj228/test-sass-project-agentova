@@ -84,3 +84,18 @@ export interface Employee {
   hexColor: string;
   description: string;
 }
+
+// ========================== TYPES COMMENTS ==============================
+
+export interface CommentType {
+  id: string;
+  workspace_id: string;
+  text: string;
+  author_id: string;
+  created_at: Date;
+}
+
+export interface CreateCommentType {
+  text: string;
+  author_id: string;
+}

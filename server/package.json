@@ -2,15 +2,19 @@
   "name": "server",
   "scripts": {
     "lint": "exit 0",
-    "build": "tsc --noEmit --strict && echo 'Build TypeScript check'",
+    "build": "tsc -p tsconfig.json",
+    "migrate": "npm run prisma:deploy",
     "build:watch": "echo 'Build watch simulé' && exit 0",
     "shell": "echo 'Shell simulé' && exit 0",
     "start": "echo 'Start simulé' && exit 0",
     "deploy": "bash ../scripts/deploy.sh",
-    "dev": "bash ../scripts/deploy.sh"
+    "dev": "bash ../scripts/deploy.sh",
+    "prisma:generate": "prisma generate --schema ./db/prisma/schema.prisma",
+    "prisma:deploy": "prisma migrate deploy --schema ./db/prisma/schema.prisma",
+    "prisma:dev": "prisma migrate dev --schema ./db/prisma/schema.prisma --name init"
   },
   "engines": {
-    "node": "22"
+    "node": "20"
   },
   "main": "lib/server/index.js",
   "dependencies": {

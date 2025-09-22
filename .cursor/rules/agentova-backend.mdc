@@ -520,3 +520,41 @@ async create(
   config: CustomAgentNotificationConfig  // ✅ Type spécifique
 ): Promise<CustomAgentNotification>
 ```
+
+## 🏗️ ARCHITECTURE DOSSIERS SERVER OBLIGATOIRE (miroir ARCHITECTURE.md)
+
+La structure du dossier `server/` DOIT correspondre à `server/ARCHITECTURE.md`.
+
+```
+server/
+├── db/                    # 🗄️ Couche données
+│   ├── prisma/           # Schémas et migrations Prisma
+│   │   ├── schema.prisma # Modèles de données
+│   │   └── migrations/   # Migrations SQL
+│   ├── repositories/     # Pattern Repository
+│   └── config.ts         # Configuration base de données
+├── src/
+│   ├── routes/                # onRequest (HTTP/webhooks) protégés
+│   ├── services/              # onCall/onRequest (cascade 7 étapes)
+│   ├── utils/                 # validation.ts, authWorkspace.ts, migrate.ts, ...
+│   ├── triggers/              # Triggers Firebase
+│   └── main.ts                # setGlobalOptions + defineSecret + init admin
+├── shared/
+│   └── types/                 # Types backend spécifiques
+└── ../shared/                 # Types full‑stack (types.ts, colors.ts, ...)
+```
+
+### ✅ Migrations base de données
+- Fichiers SQL dans `server/db/migrations/` (ordre lexical, idempotents).
+- Runner obligatoire (ex: `server/src/utils/migrate.ts`) ou Prisma `migrate`.
+- Script NPM requis: `npm run migrate` → applique toutes les migrations.
+
+### ✅ Exigences Configuration
+- `setGlobalOptions`: dev → `us-central1`, prod → `europe-west1`.
+- Secrets via `defineSecret` (ex: `DATABASE_URL`, `JWT_WORKSPACE_SECRET`).
+- En émulateur: fournir secrets via `server/.secret.local` (clé=valeur).
+
+### ✅ Conformité Functions
+- onCall/onRequest DOIVENT importer/utiliser `createResponseWithTokens()`.
+- Cascade 7 étapes obligatoire (auth → params → workspace → métier → log → response).
+- Repositories: `WHERE workspace_id = $1`, paramètres préparés, singleton lazy via `db/repositories/index.ts`.

@@ -4,11 +4,13 @@ import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { AI_EMPLOYEES } from '@/data/ai-employees';
 import { useTexts } from '@/hooks/useTexts';
-import { RiAddLine, RiDeleteBinLine, RiEditLine } from 'react-icons/ri';
+import { useComments } from '@/hooks/useComments';
+import { RiAddLine, RiDeleteBinLine } from 'react-icons/ri';
 
 export default function DashboardPage() {
   const router = useRouter();
   const { texts, createText, deleteText, isLoading, isCreating, isDeleting } = useTexts();
+  const { comments, createComment, deleteComment, isLoading: isLoadingComments, isCreating: isCreatingComment, isDeleting: isDeletingComment } = useComments();
   
   const [showForm, setShowForm] = useState(false);
   const [formData, setFormData] = useState({ title: '', content: '' });
@@ -171,8 +173,86 @@ export default function DashboardPage() {
               )}
             </div>
           </div>
+
+          {/* Section Gestion des Commentaires */}
+          <div className="bg-white rounded-lg shadow-sm p-6">
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-xl font-semibold text-gray-900">
+                Gestion des Commentaires
+              </h2>
+            </div>
+
+            {/* Formulaire de création */}
+            <CommentForm onCreate={(text) => createComment(text)} isCreating={isCreatingComment} />
+
+            {/* Liste des commentaires */}
+            <div className="space-y-4 mt-4">
+              {isLoadingComments ? (
+                <div className="text-center py-8">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
+                  <p className="text-gray-500 mt-2">Chargement des commentaires...</p>
+                </div>
+              ) : comments.length === 0 ? (
+                <div className="text-center py-8 text-gray-500">
+                  <p>Aucun commentaire.</p>
+                </div>
+              ) : (
+                comments.map((c) => (
+                  <div key={c.id} className="border border-gray-200 rounded-lg p-4 hover:border-gray-300 transition-colors">
+                    <div className="flex justify-between items-start mb-2">
+                      <h3 className="font-medium text-gray-900">{c.text}</h3>
+                      <button
+                        onClick={() => deleteComment(c.id)}
+                        disabled={isDeletingComment}
+                        className="text-red-600 hover:text-red-800 p-1"
+                        title="Supprimer"
+                      >
+                        <RiDeleteBinLine className="w-4 h-4" />
+                      </button>
+                    </div>
+                    <p className="text-xs text-gray-400">
+                      Créé le {new Date(c.created_at).toLocaleDateString('fr-FR')} à {new Date(c.created_at).toLocaleTimeString('fr-FR')}
+                    </p>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
         </div>
       </div>
     </div>
   );
 } 
+
+function CommentForm({ onCreate, isCreating }: { onCreate: (text: string) => void; isCreating: boolean }) {
+  const [value, setValue] = React.useState('');
+  return (
+    <form
+      onSubmit={(e) => {
+        e.preventDefault();
+        if (value.trim()) {
+          onCreate(value.trim());
+          setValue('');
+        }
+      }}
+      className="mb-2"
+    >
+      <div className="flex gap-2">
+        <input
+          type="text"
+          value={value}
+          onChange={(e) => setValue(e.target.value)}
+          className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+          placeholder="Votre commentaire..."
+        />
+        <button
+          type="submit"
+          disabled={!value.trim() || isCreating}
+          className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          {isCreating ? 'Ajout...' : 'Ajouter'}
+        </button>
+      </div>
+    </form>
+  );
+}

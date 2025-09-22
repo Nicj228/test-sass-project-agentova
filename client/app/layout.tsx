@@ -1,5 +1,6 @@
 import './globals.css';
 import { AuthProvider } from '@/contexts/AuthContext';
+import QueryProvider from '@/providers/QueryProvider';
 
 export default function RootLayout({
   children,
@@ -14,7 +15,9 @@ export default function RootLayout({
       </head>
       <body className="antialiased bg-gray-100">
         <AuthProvider>
-          {children}
+          <QueryProvider>
+            {children}
+          </QueryProvider>
         </AuthProvider>
       </body>
     </html>

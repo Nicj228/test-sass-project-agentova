@@ -1,26 +1,14 @@
 import { Pool } from 'pg';
 import { getPool } from '../config.js';
+import { TextType as SharedTextType, CreateTextType as SharedCreateTextType } from '../../../shared/types.js';
 
 /**
  * Repository pour la gestion des textes
  * 🔧 VERSION DEMO - Repository de test pour les textes
  */
 
-export interface TextType {
-  id: string;
-  workspace_id: string;
-  title: string;
-  content: string;
-  created_by: string;
-  created_at: Date;
-  updated_at: Date;
-}
-
-export interface CreateTextType {
-  title: string;
-  content: string;
-  created_by: string;
-}
+export type TextType = SharedTextType;
+export type CreateTextType = SharedCreateTextType;
 
 export class TextRepository {
   private pool: Pool;
